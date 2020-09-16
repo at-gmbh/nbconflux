@@ -81,17 +81,21 @@ class ConfluenceExporter(HTMLExporter):
         c.merge(overrides)
         return c
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, edit_notifications, **kwargs):
         config.HTMLExporter.preprocessors = [ConfluencePreprocessor]
         config.HTMLExporter.filters = {
             'sanitize_html': sanitize_html,
         }
+
 
         super(ConfluenceExporter, self).__init__(config=config, **kwargs)
         self._preprocessors[-1].exporter = self
 
         self.template_path = [os.path.abspath(os.path.dirname(__file__))]
         self.template_file = 'confluence'
+
+        self.edit_notifications = edit_notifications
+
         # Must be at least a single character, or the header generator produces
         # an (invalid?) empty anchor tag that trips up bleach during
         # sanitization
@@ -202,7 +206,10 @@ class ConfluenceExporter(HTMLExporter):
         resp = requests.put('{server}/rest/api/content/{page_id}'.format(server=self.server,
                                                                          page_id=page_id),
                             json={
-                               'version': {"number":version + 1},
+                               'version': {
+                                   'number': version + 1,
+                                   'minorEdit': not self.edit_notifications,
+                                   },
                                'title': title,
                                'type': 'page',
                                'body': {
