@@ -170,6 +170,7 @@ def test_optional_components(notebook_path, page_url, server):
     # Mock current page version lookup
     server.add('GET', 'http://confluence.localhost/rest/api/content/12345',
         json={
+            'title': 'some-fake-title',
             'version': {
                 'number': 100
             }
@@ -189,6 +190,51 @@ def test_optional_components(notebook_path, page_url, server):
     assert 'ipython.min.css' not in html
     # Includes MathJax
     assert 'MathJax' in html
+
+def test_extra_flags(notebook_path, page_url, server):
+    """Page should not include code cells """
+    # Mock page space/name translation to page ID
+    server.add('GET', 'http://confluence.localhost/rest/api/content?title=Some+Page+Name&spaceKey=SPACE',
+        match_querystring=True,
+        json={
+            'results': [
+                {
+                    'id': 12345
+                }
+            ]
+        })
+    # Mock current page attachment lookup
+    server.add('GET', 'http://confluence.localhost/rest/api/content/12345/child/attachment?expand=version',
+        match_querystring=True,
+        json={
+            'results': [
+                {
+                    'id': 1,
+                    'title': 'output_6_0.png',
+                    'version': {
+                        'number': 5
+                    }
+                }
+            ]
+        })
+    # Mock current page version lookup
+    server.add('GET', 'http://confluence.localhost/rest/api/content/12345',
+        json={
+            'title': 'some-fake-title',
+            'version': {
+                'number': 100
+            }
+        })
+    # Mock updating the page content
+    server.add('PUT', 'http://confluence.localhost/rest/api/content/12345')
+    # Mock adding the page label
+    server.add('POST', 'http://confluence.localhost/rest/api/content/12345/label')
+    # Mock updating image attachment, but not the notebook attachment
+    server.add('POST', 'http://confluence.localhost/rest/api/content/12345/child/attachment/1/data')
+
+    html, resources = nbconflux.notebook_to_page(notebook_path, page_url, 'fake-username', 'fake-pass', edit_notifications=False, exclude_input=True)
+
+    assert 'import seaborn' not in html
 
 
 def test_post_to_unknown(notebook_path, bad_page_url, server):
